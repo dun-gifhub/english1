@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Tap Hunter</string>
+    <string name="title_home">Home</string>
+    <string name="title_subjects">Subjects &amp; Units</string>
+    <string name="title_tap_game">Tap Hunter Game</string>
+    <string name="title_friends">Friends &amp; Rooms</string>
+    <string name="title_call_room">Study Call Room</string>
+    <string name="title_leaderboard">Leaderboard</string>
+    <string name="title_profile">Hunter Profile</string>
+</resources>

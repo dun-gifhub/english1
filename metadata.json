@@ -1,0 +1,6 @@
+{
+  "name": "Tap Hunter",
+  "description": "App học tiếng Anh Tap Hunter phân cấp từ Lớp 6 - 12 với 2 nhánh Giáo viên (ra đề, từ mới, ngữ pháp) và Học sinh (đấu từ, làm bài), tích hợp từ điển song ngữ Anh - Việt & Việt - Anh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

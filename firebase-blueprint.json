@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "users": {
+      "path": "users/{userId}",
+      "fields": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "friendCode": { "type": "string" },
+        "role": { "type": "string" },
+        "selectedGrade": { "type": "number" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "highestScore": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "avatarColor": { "type": "number" },
+        "status": { "type": "string" },
+        "updatedAt": { "type": "timestamp" }
+      }
+    },
+    "assignments": {
+      "path": "assignments/{assignmentId}",
+      "fields": {
+        "id": { "type": "string" },
+        "teacherUid": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "grade": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "questions": { "type": "list" },
+        "createdAt": { "type": "timestamp" }
+      }
+    },
+    "customWords": {
+      "path": "customWords/{wordId}",
+      "fields": {
+        "id": { "type": "string" },
+        "teacherUid": { "type": "string" },
+        "grade": { "type": "number" },
+        "unitNumber": { "type": "number" },
+        "word": { "type": "string" },
+        "phonetic": { "type": "string" },
+        "meaningVi": { "type": "string" },
+        "exampleEn": { "type": "string" },
+        "exampleVi": { "type": "string" },
+        "distractorsVi": { "type": "list" },
+        "createdAt": { "type": "timestamp" }
+      }
+    },
+    "customGrammar": {
+      "path": "customGrammar/{grammarId}",
+      "fields": {
+        "id": { "type": "string" },
+        "teacherUid": { "type": "string" },
+        "grade": { "type": "number" },
+        "title": { "type": "string" },
+        "formula": { "type": "string" },
+        "explanationVi": { "type": "string" },
+        "exampleEn": { "type": "string" },
+        "exampleVi": { "type": "string" },
+        "usageNotes": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      }
+    }
+  }
+}
