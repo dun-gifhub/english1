@@ -9,16 +9,69 @@ data class UserProfile(
     val uid: String = "",
     val email: String = "",
     val displayName: String = "",
+    val customClassName: String = "10A1", // Tên lớp học, ví dụ 10A1, 11A2, 12A3
+    val baseGrade: Int = 10, // Khối lớp gốc khi đăng ký (6..12)
+    val registeredAcademicYear: Int = 2026, // Năm học bắt đầu đăng ký (bắt đầu tháng 9 hàng năm)
     val friendCode: String = "",
     val role: UserRole = UserRole.STUDENT,
     val selectedGrade: Int = 10, // 6..12
     val level: Int = 1,
-    val xp: Int = 120,
-    val highestScore: Int = 1540,
-    val streakDays: Int = 5,
+    val xp: Int = 0,
+    val highestScore: Int = 0,
+    val monthlyScore: Int = 0,
+    val lastScoreMonthKey: String = "", // Ví dụ "2026-10"
+    val streakDays: Int = 1,
     val avatarColor: Long = 0xFF00E5FF,
     val status: String = "Sẵn sàng săn từ vựng!"
-)
+) {
+    /**
+     * Tự động tính toán khối lớp hiện tại theo năm học.
+     * Tại Việt Nam, năm học bắt đầu vào tháng 9 (Tháng 9 - Tháng 5 năm sau là một niên khóa).
+     * Ví dụ: Học sinh đăng ký lớp 10 vào niên khóa 2026-2027 (bắt đầu 09/2026).
+     * Đến tháng 09/2027 (niên khóa 2027-2028), lớp sẽ tự động tăng lên 11!
+     */
+    fun calculateCurrentGrade(): Int {
+        val calendar = java.util.Calendar.getInstance()
+        val currentYear = calendar.get(java.util.Calendar.YEAR)
+        val currentMonth = calendar.get(java.util.Calendar.MONTH) + 1 // 1..12
+        val currentAcademicYear = if (currentMonth >= 9) currentYear else currentYear - 1
+        val yearsPassed = maxOf(0, currentAcademicYear - registeredAcademicYear)
+        return minOf(13, baseGrade + yearsPassed)
+    }
+
+    /**
+     * Trả về tên lớp hiển thị (tự động cập nhật số lớp theo năm học).
+     * Ví dụ: 10A1 -> 11A1 sau 1 năm học.
+     */
+    fun getDisplayClassName(): String {
+        val grade = calculateCurrentGrade()
+        if (grade > 12) {
+            return "Cựu học sinh Lương Phú (K$registeredAcademicYear)"
+        }
+        val trimmed = customClassName.trim()
+        if (trimmed.isNotBlank()) {
+            val prefixRegex = Regex("^\\d+")
+            val match = prefixRegex.find(trimmed)
+            return if (match != null) {
+                trimmed.replaceFirst(match.value, grade.toString())
+            } else {
+                "Lớp $grade ($trimmed)"
+            }
+        }
+        return "Lớp $grade"
+    }
+
+    /**
+     * Niên khóa hiện tại (ví dụ: "2026 - 2027")
+     */
+    fun getCurrentSchoolYearString(): String {
+        val calendar = java.util.Calendar.getInstance()
+        val currentYear = calendar.get(java.util.Calendar.YEAR)
+        val currentMonth = calendar.get(java.util.Calendar.MONTH) + 1
+        val startYear = if (currentMonth >= 9) currentYear else currentYear - 1
+        return "$startYear - ${startYear + 1}"
+    }
+}
 
 data class WordItem(
     val id: String = "",
@@ -118,8 +171,11 @@ data class CallRoom(
 data class LeaderboardEntry(
     val rank: Int = 1,
     val name: String = "",
+    val className: String = "Lớp 10A1",
     val score: Int = 0,
+    val monthlyScore: Int = 0,
     val level: Int = 1,
     val grade: Int = 10,
-    val badge: String = ""
+    val badge: String = "",
+    val avatarColor: Long = 0xFF00E5FF
 )

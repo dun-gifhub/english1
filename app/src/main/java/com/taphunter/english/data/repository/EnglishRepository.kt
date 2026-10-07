@@ -6,6 +6,7 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import com.taphunter.english.R
 import com.taphunter.english.data.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -117,9 +118,13 @@ class EnglishRepository(
     private val _customGrammar = MutableStateFlow<List<GrammarLesson>>(emptyList())
     val customGrammar: StateFlow<List<GrammarLesson>> = _customGrammar.asStateFlow()
 
+    private val _registeredUsers = MutableStateFlow<List<UserProfile>>(emptyList())
+    val registeredUsers: StateFlow<List<UserProfile>> = _registeredUsers.asStateFlow()
+
     private var assignmentsListener: ListenerRegistration? = null
     private var wordsListener: ListenerRegistration? = null
     private var grammarListener: ListenerRegistration? = null
+    private var usersListener: ListenerRegistration? = null
 
     init {
         // Start listening to Firestore collections when authenticated
@@ -238,6 +243,50 @@ class EnglishRepository(
                 _customGrammar.value = grammarList
             }
         }
+
+        // 4. Observe Users for Real-Time Monthly & All-Time Leaderboard
+        val usersRef = db.collection("users")
+        usersListener = usersRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val cal = java.util.Calendar.getInstance()
+                val currentMonth = String.format(java.util.Locale.US, "%04d-%02d", cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+
+                val userList = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val uid = doc.id
+                        val name = doc.getString("displayName") ?: "Học sinh"
+                        val customClass = doc.getString("customClassName") ?: "10A1"
+                        val baseGrade = doc.getLong("baseGrade")?.toInt() ?: 10
+                        val regYear = doc.getLong("registeredAcademicYear")?.toInt() ?: 2026
+                        val xp = doc.getLong("xp")?.toInt() ?: 0
+                        val level = doc.getLong("level")?.toInt() ?: 1
+                        val highestScore = doc.getLong("highestScore")?.toInt() ?: 0
+                        val monthlyScore = doc.getLong("monthlyScore")?.toInt() ?: 0
+                        val lastMonth = doc.getString("lastScoreMonthKey") ?: ""
+                        val activeMonthly = if (lastMonth == currentMonth) monthlyScore else 0
+
+                        UserProfile(
+                            uid = uid,
+                            displayName = name,
+                            customClassName = customClass,
+                            baseGrade = baseGrade,
+                            registeredAcademicYear = regYear,
+                            level = level,
+                            xp = xp,
+                            highestScore = highestScore,
+                            monthlyScore = activeMonthly,
+                            lastScoreMonthKey = currentMonth
+                        )
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                _registeredUsers.value = userList
+            }
+        }
     }
 
     private fun detachFirestoreListeners() {
@@ -247,11 +296,13 @@ class EnglishRepository(
         wordsListener = null
         grammarListener?.remove()
         grammarListener = null
+        usersListener?.remove()
+        usersListener = null
     }
 
     fun addCustomAssignment(assignment: TeacherAssignment) {
         val uid = auth.currentUser?.uid ?: "teacher_local"
-        _assignments.value = listOf(assignment) + _assignments.value
+        _assignments.value = listOf(assignment) + _assignments.value.filter { it.id != assignment.id }
 
         val payload = hashMapOf(
             "id" to assignment.id,
@@ -277,6 +328,56 @@ class EnglishRepository(
             .addOnFailureListener { e ->
                 handleFirestoreError(e, OperationType.CREATE, docRef.path)
             }
+    }
+
+    fun updateCustomAssignment(assignment: TeacherAssignment) {
+        val uid = auth.currentUser?.uid ?: "teacher_local"
+        _assignments.value = _assignments.value.map { if (it.id == assignment.id) assignment else it }
+
+        val payload = hashMapOf(
+            "id" to assignment.id,
+            "teacherUid" to uid,
+            "teacherName" to assignment.teacherName,
+            "grade" to assignment.grade,
+            "title" to assignment.title,
+            "description" to assignment.description,
+            "questions" to assignment.questions.map { q ->
+                mapOf(
+                    "id" to q.id,
+                    "question" to q.question,
+                    "options" to q.options,
+                    "correctIndex" to q.correctIndex,
+                    "explanation" to q.explanation
+                )
+            },
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        val docRef = db.collection("assignments").document(assignment.id)
+        docRef.set(payload, SetOptions.merge())
+            .addOnFailureListener { e ->
+                handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            }
+    }
+
+    fun deleteCustomAssignment(assignmentId: String) {
+        _assignments.value = _assignments.value.filter { it.id != assignmentId }
+        val docRef = db.collection("assignments").document(assignmentId)
+        docRef.delete()
+            .addOnFailureListener { e ->
+                handleFirestoreError(e, OperationType.DELETE, docRef.path)
+            }
+    }
+
+    fun generateAndSaveReputableExam(
+        grade: Int,
+        source: ExamSource,
+        questionCount: Int,
+        teacherName: String
+    ): TeacherAssignment {
+        val exam = ReputableExamBank.generateReputableExam(grade, source, questionCount, teacherName)
+        addCustomAssignment(exam)
+        return exam
     }
 
     fun addCustomWord(
@@ -455,29 +556,28 @@ class EnglishRepository(
         DictionaryEntry("textbook", "/ˈtekst.bʊk/", "n", "sách giáo khoa chuẩn chương trình", "Refer to the textbook for details.", "Hãy tham khảo sách giáo khoa để biết thêm chi tiết.", listOf("coursebook", "manual")),
         DictionaryEntry("pottery", "/ˈpɒt.ər.i/", "n", "đồ gốm, nghệ thuật gốm sứ", "Bat Trang is famous for traditional pottery.", "Bát Tràng nổi tiếng với đồ gốm truyền thống.", listOf("ceramics")),
         DictionaryEntry("sunburn", "/ˈsʌn.bɜːn/", "n", "vết cháy nắng, bỏng rát do ánh mặt trời", "Sunburn damages sensitive skin.", "Cháy nắng gây hại cho làn da nhạy cảm.", listOf("solar burn")),
-        DictionaryEntry("allergy", "/ˈæl.ə.dʒi/", "n", "chứng dị ứng phấn hoa / hải sản", "He takes medicine for his allergy.", "Cậu ấy uống thuốc điều trị chứng dị ứng.", listOf("hypersensitivity"))
+        DictionaryEntry("allergy", "/ˈæl.ə.dʒi/", "n", "chứng dị ứng phấn hoa / hải sản", "He takes medicine for his allergy.", "Cậu ấy uống thuốc điều trị chứng dị ứng.", listOf("hypersensitivity")),
+        DictionaryEntry("school", "/skuːl/", "n", "trường học, ngôi trường", "Luong Phu High School is located in Thai Nguyen.", "Trường THPT Lương Phú nằm tại Thái Nguyên.", listOf("academy", "institution")),
+        DictionaryEntry("teacher", "/ˈtiː.tʃər/", "n", "giáo viên, thầy cô giáo", "The teacher explained the lesson clearly.", "Thầy giáo giải thích bài học rất rõ ràng.", listOf("instructor", "educator")),
+        DictionaryEntry("student", "/ˈstjuː.dənt/", "n", "học sinh, sinh viên", "Students are eager to practice reflex English.", "Học sinh rất hào hứng luyện tiếng Anh phản xạ.", listOf("pupil", "learner")),
+        DictionaryEntry("education", "/ˌedʒ.ʊˈkeɪ.ʃən/", "n", "nền giáo dục, việc học tập", "Education empowers the youth.", "Giáo dục chắp cánh cho thế hệ trẻ.", listOf("instruction", "schooling")),
+        DictionaryEntry("knowledge", "/ˈnɒl.ɪdʒ/", "n", "kiến thức, sự hiểu biết", "Knowledge is power.", "Tri thức là sức mạnh.", listOf("understanding", "wisdom")),
+        DictionaryEntry("practice", "/ˈpræk.tɪs/", "v, n", "luyện tập, thực hành", "Practice makes perfect.", "Có công mài sắt có ngày nên kim.", listOf("train", "exercise")),
+        DictionaryEntry("intelligent", "/ɪnˈtel.ɪ.dʒənt/", "adj", "thông minh, sáng dạ", "She is an intelligent student.", "Cô ấy là một học sinh thông minh.", listOf("smart", "clever")),
+        DictionaryEntry("environment", "/ɪnˈvaɪ.rən.mənt/", "n", "môi trường sống tự nhiên", "Protect our school environment.", "Hãy bảo vệ môi trường trường học của chúng ta.", listOf("surroundings", "nature")),
+        DictionaryEntry("friendly", "/ˈfrend.li/", "adj", "thân thiện, hòa đồng, hiếu khách", "Teachers and students are friendly.", "Thầy cô và bạn bè đều rất thân thiện.", listOf("welcoming", "amiable")),
+        DictionaryEntry("future", "/ˈfjuː.tʃər/", "n, adj", "tương lai, ngày mai", "Work hard for a brighter future.", "Hãy nỗ lực cho một tương lai tươi sáng hơn.", listOf("tomorrow")),
+        DictionaryEntry("success", "/səkˈses/", "n", "sự thành công, thắng lợi", "Patience leads to success.", "Sự kiên nhẫn dẫn lối đến thành công.", listOf("achievement", "triumph")),
+        DictionaryEntry("challenge", "/ˈtʃæl.ɪndʒ/", "n, v", "thử thách, thách thức vượt lên", "Every exam is an exciting challenge.", "Mỗi kỳ thi là một thử thách thú vị.", listOf("trial", "contest")),
+        DictionaryEntry("curiosity", "/ˌkjʊə.riˈɒs.ə.ti/", "n", "tính tò mò, lòng ham học hỏi", "Children learn through curiosity.", "Trẻ em học hỏi qua lòng tò mò.", listOf("inquisitiveness")),
+        DictionaryEntry("generation", "/ˌdʒen.əˈreɪ.ʃən/", "n", "thế hệ, lứa tuổi", "Young generation leads technology.", "Thế hệ trẻ dẫn dắt công nghệ.", listOf("era", "age group")),
+        DictionaryEntry("independent", "/ˌɪn.dɪˈpen.dənt/", "adj", "độc lập, tự chủ, tự lực", "He became independent after university.", "Anh ấy trở nên tự lập sau khi tốt nghiệp đại học.", listOf("self-reliant")),
+        DictionaryEntry("opportunity", "/ˌɒp.əˈtʃuː.nə.ti/", "n", "cơ hội, thời cơ tốt", "Grab the opportunity to study abroad.", "Hãy nắm bắt cơ hội đi du học.", listOf("chance", "opening")),
+        DictionaryEntry("confidence", "/ˈkɒn.fɪ.dəns/", "n", "sự tự tin, niềm tin vào bản thân", "Speak English with confidence.", "Hãy nói tiếng Anh với sự tự tin.", listOf("assurance", "belief"))
     )
 
     fun searchDictionary(query: String, isEnglishToVietnamese: Boolean): List<DictionaryEntry> {
-        val q = query.trim().lowercase()
-        if (q.isEmpty()) return dictionaryDatabase.take(20)
-
-        val normalizedQuery = removeDiacritics(q)
-
-        return dictionaryDatabase.filter { entry ->
-            val normMeaning = removeDiacritics(entry.meaningVi.lowercase())
-            val normWord = entry.wordEn.lowercase()
-
-            if (isEnglishToVietnamese) {
-                normWord.contains(q) ||
-                entry.synonyms.any { it.lowercase().contains(q) } ||
-                normMeaning.contains(normalizedQuery)
-            } else {
-                normMeaning.contains(normalizedQuery) ||
-                entry.meaningVi.lowercase().contains(q) ||
-                normWord.contains(q)
-            }
-        }
+        return ComprehensiveDictionary.lookup(query, isEnglishToVietnamese)
     }
 
     private fun removeDiacritics(text: String): String {
@@ -1049,16 +1149,49 @@ class EnglishRepository(
         )
     }
 
-    fun getLeaderboard(): List<LeaderboardEntry> {
-        return listOf(
-            LeaderboardEntry(1, "Nguyễn Minh Đức (Chuyên Anh 12)", 3420, 12, 12, "Thần Tốc"),
-            LeaderboardEntry(2, "Trần Hải Anh (HSG Tỉnh 11)", 3150, 11, 11, "Xạ Thủ"),
-            LeaderboardEntry(3, "Lê Bảo Nam (Lớp 10)", 2890, 10, 10, "Thợ Săn Bạc"),
-            LeaderboardEntry(4, "Bạn (Thợ Săn HSG)", 2100, 7, 10, "Vàng"),
-            LeaderboardEntry(5, "Đặng Thu Phương (Lớp 9)", 1950, 6, 9, "Chiến Binh"),
-            LeaderboardEntry(6, "Hoàng Quang Huy (Lớp 8)", 1720, 5, 8, "Tập Sự"),
-            LeaderboardEntry(7, "Phạm Ngọc Ánh (Lớp 7)", 1510, 4, 7, "Tân Binh"),
-            LeaderboardEntry(8, "Vũ Tuấn Kiệt (Lớp 6)", 1340, 3, 6, "Mầm Non")
-        )
+    fun getLeaderboard(currentUser: UserProfile? = null, isMonthly: Boolean = true): List<LeaderboardEntry> {
+        val allUsers = mutableListOf<UserProfile>()
+        allUsers.addAll(_registeredUsers.value)
+        if (currentUser != null) {
+            val existingIndex = allUsers.indexOfFirst { it.uid == currentUser.uid }
+            if (existingIndex >= 0) {
+                allUsers[existingIndex] = currentUser
+            } else {
+                allUsers.add(currentUser)
+            }
+        }
+
+        if (allUsers.isEmpty()) {
+            return emptyList()
+        }
+
+        val sorted = if (isMonthly) {
+            allUsers.sortedWith(compareByDescending<UserProfile> { it.monthlyScore }.thenByDescending { it.highestScore })
+        } else {
+            allUsers.sortedWith(compareByDescending<UserProfile> { it.highestScore }.thenByDescending { it.xp })
+        }
+
+        return sorted.mapIndexed { index, user ->
+            val pts = if (isMonthly) user.monthlyScore else user.highestScore
+            val badge = when {
+                index == 0 -> "Quán Quân"
+                index == 1 -> "Á Quân"
+                index == 2 -> "Hạng Ba"
+                user.level >= 10 -> "Thần Tốc"
+                user.level >= 5 -> "Chiến Binh"
+                else -> "Tân Binh"
+            }
+            LeaderboardEntry(
+                rank = index + 1,
+                name = user.displayName.ifBlank { "Học sinh THPT Lương Phú" },
+                className = user.getDisplayClassName(),
+                score = user.highestScore,
+                monthlyScore = user.monthlyScore,
+                level = user.level,
+                grade = user.calculateCurrentGrade(),
+                badge = badge,
+                avatarColor = user.avatarColor
+            )
+        }
     }
 }

@@ -7,46 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class FriendsRepository {
-    private val _friends = MutableStateFlow<List<Friend>>(
-        listOf(
-            Friend(
-                uid = "u_duc",
-                friendCode = "TAP-8841",
-                displayName = "Minh Đức (Chuyên Anh)",
-                status = "Đang leo rank HSG",
-                isOnline = true,
-                currentActivity = "Đang chơi Unit 1: Idioms",
-                avatarColor = 0xFF00E5FF
-            ),
-            Friend(
-                uid = "u_haianh",
-                friendCode = "TAP-3912",
-                displayName = "Hải Anh",
-                status = "Trong phòng gọi nhóm",
-                isOnline = true,
-                currentActivity = "Phòng Gọi #7890",
-                avatarColor = 0xFFFFD166
-            ),
-            Friend(
-                uid = "u_baonam",
-                friendCode = "TAP-6520",
-                displayName = "Bảo Nam",
-                status = "Sẵn sàng săn từ",
-                isOnline = true,
-                currentActivity = "Online - Đang đợi thách đấu",
-                avatarColor = 0xFF06D6A0
-            ),
-            Friend(
-                uid = "u_phuong",
-                friendCode = "TAP-1129",
-                displayName = "Thu Phương",
-                status = "Nghỉ ngơi",
-                isOnline = false,
-                currentActivity = "Offline 15 phút trước",
-                avatarColor = 0xFF9D4EDD
-            )
-        )
-    )
+    private val _friends = MutableStateFlow<List<Friend>>(emptyList())
     val friends: StateFlow<List<Friend>> = _friends.asStateFlow()
 
     private val _activeRoom = MutableStateFlow<CallRoom?>(null)
@@ -58,7 +19,7 @@ class FriendsRepository {
     fun addFriendByCode(code: String): Boolean {
         val trimmed = code.trim().uppercase()
         if (trimmed.length < 6) {
-            _friendMessage.value = "Mã kết bạn không hợp lệ (Ví dụ: TAP-1234)"
+            _friendMessage.value = "Mã kết bạn không hợp lệ (Ví dụ: LP-1234)"
             return false
         }
         if (_friends.value.any { it.friendCode.equals(trimmed, ignoreCase = true) }) {
@@ -69,8 +30,8 @@ class FriendsRepository {
         val newFriend = Friend(
             uid = "u_${System.currentTimeMillis()}",
             friendCode = trimmed,
-            displayName = "Thợ Săn $trimmed",
-            status = "Vừa kết bạn",
+            displayName = "Bạn học $trimmed",
+            status = "Học sinh THPT Lương Phú",
             isOnline = true,
             currentActivity = "Online",
             avatarColor = 0xFFFF70A6
@@ -92,9 +53,7 @@ class FriendsRepository {
             title = "Phòng Học & Luyện Phản Xạ #$roomCode",
             hostName = hostName,
             participants = listOf(
-                Friend("host", "YOU", hostName, "Trưởng phòng", true, "Đang chủ trì", 0xFF00E5FF),
-                Friend("f1", "TAP-8841", "Minh Đức", "Thành viên", true, "Đang nghe", 0xFFFFD166),
-                Friend("f2", "TAP-3912", "Hải Anh", "Thành viên", true, "Đang phát biểu", 0xFF06D6A0)
+                Friend("host", "YOU", hostName, "Trưởng phòng", true, "Đang chủ trì", 0xFF00E5FF)
             )
         )
         _activeRoom.value = room
@@ -111,11 +70,9 @@ class FriendsRepository {
             roomId = "room_$trimmed",
             roomCode = trimmed,
             title = "Phòng Học Nhóm HSG #$trimmed",
-            hostName = "Minh Đức (Chuyên Anh)",
+            hostName = "Chủ phòng #$trimmed",
             participants = listOf(
-                Friend("f1", "TAP-8841", "Minh Đức (Chủ phòng)", "Online", true, "Đang nói", 0xFF00E5FF),
-                Friend("me", "YOU", userName, "Online", true, "Vừa tham gia", 0xFFFFD166),
-                Friend("f2", "TAP-3912", "Hải Anh", "Online", true, "Sẵn sàng", 0xFF06D6A0)
+                Friend("me", "YOU", userName, "Thành viên", true, "Vừa tham gia", 0xFF00E5FF)
             )
         )
         _activeRoom.value = room

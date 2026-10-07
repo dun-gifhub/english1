@@ -2,6 +2,7 @@ package com.taphunter.english.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,6 +28,8 @@ import com.taphunter.english.data.models.GrammarLesson
 import com.taphunter.english.data.models.TeacherAssignment
 import com.taphunter.english.data.models.WordItem
 import com.taphunter.english.data.repository.EnglishRepository
+import com.taphunter.english.data.repository.ExamSource
+import com.taphunter.english.data.repository.ReputableExamBank
 import com.taphunter.english.ui.theme.*
 
 @Composable
@@ -42,6 +45,9 @@ fun TeacherPortalScreen(
     val customGrammar by englishRepository.customGrammar.collectAsState()
 
     var showCreateQuizDialog by remember { mutableStateOf(false) }
+    var showGenerateExamDialog by remember { mutableStateOf(false) }
+    var editingAssignment by remember { mutableStateOf<TeacherAssignment?>(null) }
+    var deletingAssignment by remember { mutableStateOf<TeacherAssignment?>(null) }
 
     Column(
         modifier = Modifier
@@ -154,20 +160,37 @@ fun TeacherPortalScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Danh Sách Đề Thi Trên Cloud (${assignments.size})",
+                            text = "Đề Thi Đã Giao (${assignments.size})",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         )
-                        Button(
-                            onClick = { showCreateQuizDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("open_create_quiz_dialog_button")
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Navy900, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tạo Đề Mới", color = Navy900, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Generate from Reputable Sources button
+                            Button(
+                                onClick = { showGenerateExamDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = GoldYellow),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("open_generate_exam_dialog_button")
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Navy900, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("✨ Sinh Đề Chuẩn QG", color = Navy900, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
+                            // Manual create button
+                            Button(
+                                onClick = { showCreateQuizDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("open_create_quiz_dialog_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Navy900, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Tạo Đề Mới", color = Navy900, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
                         }
                     }
 
@@ -222,6 +245,41 @@ fun TeacherPortalScreen(
                                         color = TextSecondary,
                                         fontSize = 11.sp
                                     )
+
+                                    // Action buttons: Edit & Delete
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { editingAssignment = item },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CyanAccent),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp).testTag("edit_assignment_button_${item.id}")
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Sửa Đề", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        Button(
+                                            onClick = { deletingAssignment = item },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = RedDanger),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp).testTag("delete_assignment_button_${item.id}")
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Xoá Đề", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -249,6 +307,42 @@ fun TeacherPortalScreen(
                 englishRepository.addCustomAssignment(newAssignment)
                 showCreateQuizDialog = false
                 Toast.makeText(context, "Đã giao đề thi thành công cho Lớp ${newAssignment.grade}!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showGenerateExamDialog) {
+        GenerateExamDialog(
+            teacherName = teacherName,
+            onDismiss = { showGenerateExamDialog = false },
+            onGenerated = { generatedAssignment ->
+                englishRepository.addCustomAssignment(generatedAssignment)
+                showGenerateExamDialog = false
+                Toast.makeText(context, "Đã sinh và phát hành '${generatedAssignment.title}' thành công!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    editingAssignment?.let { assignmentToEdit ->
+        EditQuizDialog(
+            assignment = assignmentToEdit,
+            onDismiss = { editingAssignment = null },
+            onUpdateQuiz = { updatedAssignment ->
+                englishRepository.updateCustomAssignment(updatedAssignment)
+                editingAssignment = null
+                Toast.makeText(context, "Đã cập nhật chỉnh sửa đề thi thành công!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    deletingAssignment?.let { assignmentToDelete ->
+        ConfirmDeleteDialog(
+            assignment = assignmentToDelete,
+            onDismiss = { deletingAssignment = null },
+            onConfirmDelete = {
+                englishRepository.deleteCustomAssignment(assignmentToDelete.id)
+                deletingAssignment = null
+                Toast.makeText(context, "Đã xoá đề thi '${assignmentToDelete.title}'!", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -833,6 +927,397 @@ private fun CreateQuizDialog(
                     label = { Text("Lời giải chi tiết cho học sinh") },
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        },
+        containerColor = DarkCard
+    )
+}
+
+@Composable
+private fun ConfirmDeleteDialog(
+    assignment: TeacherAssignment,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = RedDanger)
+                Text("Xác Nhận Xoá Đề Thi", color = TextPrimary, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Thầy/Cô có chắc chắn muốn xoá đề thi này khỏi hệ thống không?",
+                    color = TextPrimary,
+                    fontSize = 14.sp
+                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Navy800),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(assignment.title, color = GoldYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Khối Lớp ${assignment.grade} • ${assignment.questions.size} câu hỏi", color = SlateBlue, fontSize = 12.sp)
+                    }
+                }
+                Text(
+                    text = "Lưu ý: Học sinh sẽ không thể tiếp tục làm đề thi này sau khi xoá.",
+                    color = RedDanger,
+                    fontSize = 11.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = RedDanger),
+                modifier = Modifier.testTag("confirm_delete_assignment_button")
+            ) {
+                Text("Xác Nhận Xoá", color = TextPrimary, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy Bỏ", color = SlateBlue)
+            }
+        },
+        containerColor = DarkCard
+    )
+}
+
+@Composable
+private fun EditQuizDialog(
+    assignment: TeacherAssignment,
+    onDismiss: () -> Unit,
+    onUpdateQuiz: (TeacherAssignment) -> Unit
+) {
+    var quizTitle by remember { mutableStateOf(assignment.title) }
+    var quizGrade by remember { mutableIntStateOf(assignment.grade) }
+    var quizDescription by remember { mutableStateOf(assignment.description) }
+
+    // Mutable list of questions
+    var questions by remember { mutableStateOf(assignment.questions) }
+
+    val scrollState = rememberScrollState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Edit, contentDescription = null, tint = CyanAccent)
+                Text("Chỉnh Sửa Đề Thi", color = TextPrimary, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = quizTitle,
+                    onValueChange = { quizTitle = it },
+                    label = { Text("Tiêu đề đề thi *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("edit_quiz_title_input")
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Khối lớp áp dụng:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf(6, 7, 8, 9, 10, 11, 12)) { g ->
+                            val isSelected = quizGrade == g
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { quizGrade = g },
+                                label = { Text("Lớp $g", fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyanAccent,
+                                    selectedLabelColor = Navy900,
+                                    containerColor = Navy800,
+                                    labelColor = TextPrimary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = quizDescription,
+                    onValueChange = { quizDescription = it },
+                    label = { Text("Ghi chú / Hướng dẫn") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                HorizontalDivider(color = DarkBorder)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Danh sách câu hỏi (${questions.size}):", color = GoldYellow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    TextButton(onClick = {
+                        val newQ = CustomQuestion(
+                            id = "q_${System.currentTimeMillis()}",
+                            question = "Câu hỏi mới cần soạn...",
+                            options = listOf("Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"),
+                            correctIndex = 0,
+                            explanation = "Giải thích đáp án chi tiết."
+                        )
+                        questions = questions + newQ
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Thêm Câu Hỏi", fontSize = 11.sp, color = CyanAccent)
+                    }
+                }
+
+                questions.forEachIndexed { qIndex, q ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Navy800)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Câu ${qIndex + 1}:", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                if (questions.size > 1) {
+                                    IconButton(
+                                        onClick = { questions = questions.filterIndexed { idx, _ -> idx != qIndex } },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Xoá câu", tint = RedDanger, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+
+                            var qText by remember { mutableStateOf(q.question) }
+                            OutlinedTextField(
+                                value = qText,
+                                onValueChange = {
+                                    qText = it
+                                    questions = questions.mapIndexed { idx, item -> if (idx == qIndex) item.copy(question = it) else item }
+                                },
+                                label = { Text("Nội dung câu hỏi") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 4 Options
+                            q.options.forEachIndexed { optIndex, optText ->
+                                val letter = when (optIndex) { 0 -> "A"; 1 -> "B"; 2 -> "C"; else -> "D" }
+                                var optVal by remember { mutableStateOf(optText) }
+                                OutlinedTextField(
+                                    value = optVal,
+                                    onValueChange = {
+                                        optVal = it
+                                        val newOpts = q.options.toMutableList()
+                                        newOpts[optIndex] = it
+                                        questions = questions.mapIndexed { idx, item -> if (idx == qIndex) item.copy(options = newOpts) else item }
+                                    },
+                                    label = { Text("Lựa chọn $letter") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            Text("Đáp án đúng:", color = TextSecondary, fontSize = 11.sp)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                                listOf("A", "B", "C", "D").forEachIndexed { idx, letter ->
+                                    FilterChip(
+                                        selected = q.correctIndex == idx,
+                                        onClick = {
+                                            questions = questions.mapIndexed { qIdx, item -> if (qIdx == qIndex) item.copy(correctIndex = idx) else item }
+                                        },
+                                        label = { Text(letter, fontWeight = FontWeight.Bold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = GreenSuccess,
+                                            selectedLabelColor = Navy900
+                                        )
+                                    )
+                                }
+                            }
+
+                            var expText by remember { mutableStateOf(q.explanation) }
+                            OutlinedTextField(
+                                value = expText,
+                                onValueChange = {
+                                    expText = it
+                                    questions = questions.mapIndexed { idx, item -> if (idx == qIndex) item.copy(explanation = it) else item }
+                                },
+                                label = { Text("Lời giải chi tiết") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (quizTitle.isBlank() || questions.isEmpty()) return@Button
+                    val updated = assignment.copy(
+                        title = quizTitle.trim(),
+                        grade = quizGrade,
+                        description = quizDescription.trim(),
+                        questions = questions
+                    )
+                    onUpdateQuiz(updated)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                modifier = Modifier.testTag("confirm_update_quiz_button")
+            ) {
+                Text("Lưu Thay Đổi", color = Navy900, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = SlateBlue)
+            }
+        },
+        containerColor = DarkCard
+    )
+}
+
+@Composable
+private fun GenerateExamDialog(
+    teacherName: String,
+    onDismiss: () -> Unit,
+    onGenerated: (TeacherAssignment) -> Unit
+) {
+    var selectedSource by remember { mutableStateOf(ExamSource.THPT_QUOC_GIA) }
+    var selectedGrade by remember { mutableIntStateOf(10) }
+    var questionCount by remember { mutableIntStateOf(5) }
+
+    val scrollState = rememberScrollState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = GoldYellow)
+                Text("Sinh Đề Thi Chuẩn Quốc Gia", color = TextPrimary, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Trích xuất câu hỏi chuẩn hóa từ các nguồn khảo thí uy tín:",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+
+                // Exam sources selector
+                ExamSource.entries.forEach { src ->
+                    val isSelected = selectedSource == src
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedSource = src }
+                            .testTag("source_option_${src.name}"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) Navy700 else Navy800
+                        ),
+                        border = if (isSelected) {
+                            CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(GoldYellow, CyanAccent)))
+                        } else null
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(src.badge, color = if (isSelected) GoldYellow else SlateBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                if (isSelected) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GoldYellow, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                            Text(src.sourceName, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text(src.description, color = SlateBlue, fontSize = 11.sp, lineHeight = 15.sp)
+                        }
+                    }
+                }
+
+                // Grade Selector
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Áp dụng cho khối lớp:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf(6, 7, 8, 9, 10, 11, 12)) { g ->
+                            val isSelected = selectedGrade == g
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedGrade = g },
+                                label = { Text("Lớp $g", fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CyanAccent,
+                                    selectedLabelColor = Navy900,
+                                    containerColor = Navy800,
+                                    labelColor = TextPrimary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Question count selector
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Số lượng câu hỏi trong đề:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(5, 10, 15).forEach { count ->
+                            val isSelected = questionCount == count
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { questionCount = count },
+                                label = { Text("$count câu", fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GoldYellow,
+                                    selectedLabelColor = Navy900,
+                                    containerColor = Navy800,
+                                    labelColor = TextPrimary
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val exam = ReputableExamBank.generateReputableExam(
+                        grade = selectedGrade,
+                        source = selectedSource,
+                        questionCount = questionCount,
+                        teacherName = teacherName
+                    )
+                    onGenerated(exam)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = GoldYellow),
+                modifier = Modifier.testTag("confirm_generate_exam_button")
+            ) {
+                Icon(Icons.Default.Bolt, contentDescription = null, tint = Navy900)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Sinh Đề & Giao Ngay", color = Navy900, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = SlateBlue)
             }
         },
         containerColor = DarkCard

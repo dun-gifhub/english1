@@ -106,16 +106,21 @@ fun HomeScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(CyanAccent.copy(alpha = 0.2f))
+                                            .background(GoldYellow.copy(alpha = 0.2f))
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
-                                        Text("Lớp $selectedGrade", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Text(
+                                            user?.getDisplayClassName() ?: "Lớp $selectedGrade",
+                                            color = GoldYellow,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
                                     }
                                 }
                                 Text(
-                                    text = "Cấp ${user?.level ?: 1} • ${user?.xp ?: 0} XP",
+                                    text = "Cấp ${user?.level ?: 1} • Điểm tháng: ${user?.monthlyScore ?: 0} PTS • ${user?.xp ?: 0} XP",
                                     color = CyanAccent,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }

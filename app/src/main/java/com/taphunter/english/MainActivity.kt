@@ -5,8 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -18,8 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,6 +106,7 @@ fun MainAppScreen(
     val customWords by englishRepository.customWords.collectAsState()
     val customGrammar by englishRepository.customGrammar.collectAsState()
     val assignmentsList by englishRepository.assignments.collectAsState()
+    val registeredUsers by englishRepository.registeredUsers.collectAsState()
 
     val subjects = remember(selectedGrade, customWords, customGrammar) {
         englishRepository.getSubjectsForGrade(selectedGrade)
@@ -112,7 +117,12 @@ fun MainAppScreen(
     val assignments = remember(selectedGrade, assignmentsList) {
         englishRepository.getAssignmentsForGrade(selectedGrade)
     }
-    val leaderboard = remember { englishRepository.getLeaderboard() }
+    val monthlyLeaderboard = remember(registeredUsers, currentUser) {
+        englishRepository.getLeaderboard(currentUser, isMonthly = true)
+    }
+    val allTimeLeaderboard = remember(registeredUsers, currentUser) {
+        englishRepository.getLeaderboard(currentUser, isMonthly = false)
+    }
 
     // Intercept back button if in a sub screen
     if (currentScreen !is AppScreen.Home) {
@@ -130,20 +140,29 @@ fun MainAppScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = null,
-                                tint = CyanAccent
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_app_logo),
+                                    contentDescription = "Logo Trường THPT Lương Phú",
+                                    modifier = Modifier.size(34.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
                             Column {
                                 Text(
-                                    text = "Tap Hunter",
+                                    text = "THPT Lương Phú",
                                     color = TextPrimary,
                                     fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 18.sp
+                                    fontSize = 16.sp
                                 )
                                 Text(
-                                    text = if (currentUser?.role == UserRole.TEACHER) "Giao diện Giáo Viên" else "Học Sinh • Lớp $selectedGrade",
+                                    text = if (currentUser?.role == UserRole.TEACHER) "Giao diện Giáo Viên" else "${currentUser?.displayName ?: "Học Sinh"} • ${currentUser?.getDisplayClassName() ?: "Lớp $selectedGrade"}",
                                     color = if (currentUser?.role == UserRole.TEACHER) PurpleNeon else CyanAccent,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -407,7 +426,9 @@ fun MainAppScreen(
 
                 is AppScreen.Leaderboard -> {
                     LeaderboardScreen(
-                        entries = leaderboard
+                        monthlyEntries = monthlyLeaderboard,
+                        allTimeEntries = allTimeLeaderboard,
+                        currentUser = currentUser
                     )
                 }
             }
