@@ -1,47 +1,23 @@
-# Android Studio Skeleton
+# Tap Hunter English - THPT Lương Phú
 
-Project Android Studio moi cho app `Tap Hunter`, dung `Kotlin + Jetpack Compose + Firebase`.
+Ứng dụng học tiếng Anh phản xạ **Tap Hunter** phân cấp từ Lớp 6 - 12 chuẩn Bộ GD&ĐT với 2 nhánh:
+- **Giáo viên**: Ra đề thi (thủ công & trích xuất ngân hàng đề THPTQG, HSG, Chuyên lớp 10, Cambridge/ĐGNL), soạn từ mới và ngữ pháp đồng bộ lên hệ thống.
+- **Học sinh**: Game phản xạ đấu từ Tap Hunt (rơi tự do, combo điểm, âm thanh phát âm chuẩn), làm bài kiểm tra trắc nghiệm nhận XP, luyện chuyên đề ngữ pháp.
+- **Từ điển thông minh song ngữ**: Tra cứu Anh - Việt & Việt - Anh, phát âm IPA & Text-To-Speech, phân tích hình vị tự động cho mọi từ mới.
+- **Phòng học & Bạn bè**: Kết bạn theo mã `LP-xxxx`, mở phòng học trực tuyến và phòng luyện phản xạ chung mã 6 số.
+- **Bảng vàng vinh danh**: Xếp hạng theo tháng và toàn thời gian, tự động tính khối lớp và niên khóa theo năm học mới (tháng 9 hàng năm).
 
-## Mo project
+## Công nghệ sử dụng
+- **React 19 + TypeScript + Vite**
+- **Tailwind CSS v4**
+- **Web Audio API & Web Speech API** cho hiệu ứng âm thanh và phát âm từ vựng
+- **Firebase Firestore & Authentication** đồng bộ dữ liệu thời gian thực
+- **Canvas Confetti** cho hiệu ứng vinh danh và hoàn thành bài thi
 
-1. Mo Android Studio.
-2. Chon `Open`.
-3. Mo thu muc: `E:/hsg/android-studio`
-
-## Can bo sung
-
-1. Tai `google-services.json` tu Firebase Console.
-2. Dat file vao: `android-studio/app/google-services.json`
-3. Bao dam Firebase da bat:
-   - Authentication / Email-Password
-   - Realtime Database
-
-## Rules Realtime Database goi y
-
-```json
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid"
-      }
-    },
-    "friend_codes": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
-    "rooms": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    }
-  }
-}
+## Khởi chạy dự án
+```bash
+npm install
+npm run dev
 ```
+Dev server lắng nghe tại `http://localhost:3000`.
 
-## Migrate de xuat
-
-1. `AuthRepository.kt`: chuyen login/register tu Kivy sang Android.
-2. `HomeScreen.kt`: thay the menu mon hoc va unit.
-3. `FriendsScreen.kt`: ket ban, room code, QR, presence.
-4. `CallRoomScreen.kt`: sau nay gan WebRTC.

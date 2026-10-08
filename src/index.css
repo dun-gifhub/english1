@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-navy-900: #0D1B2A;
+    --color-navy-800: #1B263B;
+    --color-navy-700: #27384E;
+    --color-navy-600: #415A77;
+    --color-slate-blue: #778DA9;
+    --color-cyan-accent: #00E5FF;
+    --color-gold-yellow: #FFD166;
+    --color-green-success: #06D6A0;
+    --color-red-danger: #EF476F;
+    --color-purple-neon: #9D4EDD;
+  }
+}
+
+/* Custom animations for falling words and neon glow */
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+@keyframes floatWord {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: floatWord 2s ease-in-out infinite;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0D1B2A;
+}
+::-webkit-scrollbar-thumb {
+  background: #27384E;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #415A77;
+}
